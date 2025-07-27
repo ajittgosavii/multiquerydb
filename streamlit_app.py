@@ -31,7 +31,7 @@ st.markdown("""
     
     /* Professional header banner */
     .professional-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #34495e 100%);
         padding: 3rem 2rem;
         margin: -1rem -1rem 2rem -1rem;
         border-radius: 0 0 20px 20px;
@@ -108,7 +108,7 @@ st.markdown("""
     
     /* Professional stats bar */
     .stats-container {
-        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         padding: 1.5rem 2rem;
         margin: 0 -1rem 2rem -1rem;
         display: grid;
@@ -127,7 +127,7 @@ st.markdown("""
     .stat-number {
         font-size: 2.5em;
         font-weight: 700;
-        color: #3498db;
+        color: #5dade2;
         margin: 0;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
@@ -160,7 +160,7 @@ st.markdown("""
         left: 0;
         width: 4px;
         height: 100%;
-        background: linear-gradient(135deg, #3498db, #2ecc71);
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
     }
     
     .query-card:hover {
@@ -169,7 +169,7 @@ st.markdown("""
     }
     
     .query-card.source::before {
-        background: linear-gradient(135deg, #3498db, #2980b9);
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
     }
     
     .query-card.target::before {
@@ -180,7 +180,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
         font-weight: 600;
         font-size: 1.2em;
-        color: #2c3e50;
+        color: #1e3c72;
         margin-bottom: 1rem;
         display: flex;
         align-items: center;
@@ -189,7 +189,7 @@ st.markdown("""
     
     /* Professional buttons */
     .stButton > button {
-        background: linear-gradient(135deg, #3498db, #2980b9);
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
         color: white;
         border: none;
         border-radius: 10px;
@@ -198,13 +198,13 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
         letter-spacing: 0.5px;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
-        background: linear-gradient(135deg, #2980b9, #3498db);
+        box-shadow: 0 6px 20px rgba(30, 60, 114, 0.4);
+        background: linear-gradient(135deg, #2a5298, #34495e);
     }
     
     /* Professional selectbox */
@@ -283,9 +283,9 @@ st.markdown("""
     }
     
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #3498db, #2980b9);
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
         color: white;
-        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
     }
     
     /* Sidebar styling */
@@ -1534,7 +1534,7 @@ def sidebar_features():
         <strong>🚀 Demo Contact</strong><br>
         📧 database-team@company.com<br>
         📱 +1 (555) 123-4567<br>
-        🔗 <a href="https://calendly.com/db-team" style="color: #3498db;">Schedule Follow-up Meeting</a>
+        🔗 <a href="https://calendly.com/db-team" style="color: #1e3c72;">Schedule Follow-up Meeting</a>
     </div>
     """, unsafe_allow_html=True)
 
