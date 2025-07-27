@@ -535,7 +535,8 @@ ORDER BY sa.customer_total DESC;"""
         "🔄 Oracle → SQL Server", 
         "🔄 SQL Server → PostgreSQL",
         "🎯 Complex Scenarios",
-        "📊 Performance Analysis"
+        "📊 Performance Analysis",
+        "🔍 Stored Procedure Analyzer"
     ])
     
     with demo_tabs[0]:
@@ -552,6 +553,9 @@ ORDER BY sa.customer_total DESC;"""
     
     with demo_tabs[4]:
         show_performance_analysis_demo()
+    
+    with demo_tabs[5]:
+        show_stored_procedure_analyzer()
 
 def translate_query(claude_client, query, source_db, target_db, include_optimization, 
                    include_comments, include_compatibility, container):
@@ -1120,6 +1124,483 @@ $ LANGUAGE plpgsql;"""
     - Transaction management adjusted for PostgreSQL
     """)
 
+def show_stored_procedure_analyzer():
+    """Comprehensive stored procedure analyzer for deadlocks and optimization"""
+    st.subheader("🔍 Stored Procedure Query Analyzer")
+    st.markdown("**AI-powered analysis for deadlock detection, performance optimization, and best practices**")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("""
+        <div class="query-card">
+            <div class="card-title">📝 Stored Procedure Input</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Database selection for analysis
+        analysis_db = st.selectbox(
+            "Select Database Type for Analysis:",
+            ["PostgreSQL", "Oracle", "SQL Server"],
+            key="analyzer_db"
+        )
+        
+        # Sample procedures for demo
+        sample_procedures = {
+            "PostgreSQL": """-- PostgreSQL Stored Procedure with Potential Issues
+CREATE OR REPLACE FUNCTION update_account_balance(
+    p_account_id INTEGER,
+    p_amount NUMERIC,
+    p_transaction_type VARCHAR(20)
+) RETURNS VARCHAR(100) AS $
+DECLARE
+    v_current_balance NUMERIC;
+    v_new_balance NUMERIC;
+    v_result VARCHAR(100);
+BEGIN
+    -- Potential deadlock: No locking order
+    SELECT balance INTO v_current_balance 
+    FROM accounts 
+    WHERE account_id = p_account_id;
+    
+    -- Long running transaction without proper error handling
+    UPDATE accounts 
+    SET balance = balance + p_amount,
+        last_updated = CURRENT_TIMESTAMP
+    WHERE account_id = p_account_id;
+    
+    -- Another table update - different lock order
+    INSERT INTO transaction_log (
+        account_id, 
+        amount, 
+        transaction_type, 
+        created_at
+    ) VALUES (
+        p_account_id, 
+        p_amount, 
+        p_transaction_type, 
+        CURRENT_TIMESTAMP
+    );
+    
+    -- No explicit transaction management
+    -- No proper exception handling
+    
+    RETURN 'SUCCESS';
+END;
+$ LANGUAGE plpgsql;""",
+            
+            "Oracle": """-- Oracle PL/SQL with Performance Issues
+CREATE OR REPLACE PROCEDURE update_customer_orders(
+    p_customer_id IN NUMBER,
+    p_status IN VARCHAR2
+) AS
+    v_order_count NUMBER;
+    v_total_amount NUMBER;
+BEGIN
+    -- Inefficient cursor loop instead of bulk operations
+    FOR order_rec IN (
+        SELECT order_id, amount 
+        FROM orders 
+        WHERE customer_id = p_customer_id
+    ) LOOP
+        -- Row-by-row processing (slow)
+        UPDATE orders 
+        SET status = p_status,
+            updated_date = SYSDATE
+        WHERE order_id = order_rec.order_id;
+        
+        -- Potential deadlock: No consistent lock ordering
+        UPDATE customer_summary 
+        SET total_orders = total_orders + 1
+        WHERE customer_id = p_customer_id;
+        
+        -- Missing COMMIT in long-running transaction
+    END LOOP;
+    
+    -- No error handling
+    -- No transaction size management
+    
+    COMMIT;
+END;""",
+            
+            "SQL Server": """-- SQL Server Procedure with Deadlock Potential
+CREATE PROCEDURE UpdateInventoryAndSales
+    @ProductID INT,
+    @Quantity INT,
+    @SaleAmount DECIMAL(10,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- No transaction isolation level specified
+    BEGIN TRANSACTION;
+    
+    -- First table access - could cause deadlock
+    UPDATE Inventory 
+    SET Quantity = Quantity - @Quantity,
+        LastUpdated = GETDATE()
+    WHERE ProductID = @ProductID;
+    
+    -- Delay simulation - increases deadlock window
+    WAITFOR DELAY '00:00:02';
+    
+    -- Second table access - different lock order than other procedures
+    UPDATE Products 
+    SET TotalSales = TotalSales + @SaleAmount
+    WHERE ProductID = @ProductID;
+    
+    -- Third table - extends transaction time
+    INSERT INTO SalesHistory (
+        ProductID, 
+        Quantity, 
+        SaleAmount, 
+        SaleDate
+    ) VALUES (
+        @ProductID, 
+        @Quantity, 
+        @SaleAmount, 
+        GETDATE()
+    );
+    
+    -- No error handling
+    -- Long transaction without proper timeout
+    COMMIT TRANSACTION;
+END;"""
+        }
+        
+        if st.button(f"📋 Load Sample {analysis_db} Procedure"):
+            st.session_state.analyzer_procedure = sample_procedures[analysis_db]
+        
+        # Procedure input
+        procedure_code = st.text_area(
+            "Enter your stored procedure code:",
+            height=400,
+            key="analyzer_procedure",
+            placeholder=f"Enter your {analysis_db} stored procedure here..."
+        )
+        
+        # Analysis options
+        st.markdown("**Analysis Options:**")
+        col1a, col1b = st.columns(2)
+        with col1a:
+            check_deadlocks = st.checkbox("🔒 Deadlock Detection", value=True)
+            check_performance = st.checkbox("⚡ Performance Analysis", value=True)
+        with col1b:
+            check_best_practices = st.checkbox("📋 Best Practices", value=True)
+            check_security = st.checkbox("🛡️ Security Review", value=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="query-card">
+            <div class="card-title">🔍 Analysis Results</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        analysis_container = st.container()
+    
+    # Analysis button
+    if st.button("🚀 Analyze Stored Procedure", type="primary", use_container_width=True):
+        if procedure_code.strip():
+            analyze_stored_procedure(
+                procedure_code, analysis_db, 
+                check_deadlocks, check_performance, check_best_practices, check_security,
+                analysis_container
+            )
+        else:
+            st.error("❌ Please enter a stored procedure to analyze!")
+    
+    # Show example analysis results for demo
+    show_analyzer_demo_examples()
+
+def analyze_stored_procedure(procedure_code, db_type, check_deadlocks, check_performance, 
+                           check_best_practices, check_security, container):
+    """Analyze stored procedure using Claude AI"""
+    
+    with container:
+        with st.spinner(f"🤖 Analyzing {db_type} stored procedure..."):
+            try:
+                # Create analysis prompt
+                prompt = create_procedure_analysis_prompt(
+                    procedure_code, db_type, 
+                    check_deadlocks, check_performance, check_best_practices, check_security
+                )
+                
+                # Initialize Claude if not already done
+                claude_client = init_claude()
+                
+                # Call Claude AI
+                message = claude_client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=4000,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                
+                response = message.content[0].text
+                
+                # Display analysis results
+                display_analysis_results(response, db_type)
+                
+            except Exception as e:
+                st.error(f"❌ Analysis failed: {str(e)}")
+
+def create_procedure_analysis_prompt(procedure_code, db_type, check_deadlocks, 
+                                   check_performance, check_best_practices, check_security):
+    """Create comprehensive analysis prompt for Claude AI"""
+    
+    prompt = f"""You are an expert database performance engineer specializing in {db_type}. Analyze the following stored procedure for potential issues and optimizations.
+
+STORED PROCEDURE TO ANALYZE ({db_type}):
+```sql
+{procedure_code}
+```
+
+ANALYSIS REQUIREMENTS:
+"""
+
+    if check_deadlocks:
+        prompt += """
+1. DEADLOCK DETECTION:
+   - Identify potential deadlock scenarios
+   - Analyze lock ordering patterns
+   - Check for long-running transactions
+   - Suggest lock ordering improvements
+"""
+
+    if check_performance:
+        prompt += """
+2. PERFORMANCE ANALYSIS:
+   - Identify slow operations (row-by-row processing, inefficient queries)
+   - Suggest bulk operations where applicable
+   - Analyze indexing requirements
+   - Check for unnecessary operations
+"""
+
+    if check_best_practices:
+        prompt += """
+3. BEST PRACTICES REVIEW:
+   - Error handling implementation
+   - Transaction management
+   - Code structure and readability
+   - Maintainability concerns
+"""
+
+    if check_security:
+        prompt += """
+4. SECURITY REVIEW:
+   - SQL injection vulnerabilities
+   - Privilege escalation risks
+   - Data exposure concerns
+   - Input validation issues
+"""
+
+    prompt += f"""
+
+DATABASE-SPECIFIC CONSIDERATIONS FOR {db_type}:
+"""
+
+    if db_type == "PostgreSQL":
+        prompt += """
+- Function vs procedure usage
+- Exception handling with EXCEPTION blocks
+- PERFORM vs SELECT for non-returning statements
+- Proper use of STRICT keyword
+- Advisory locks for deadlock prevention
+"""
+    elif db_type == "Oracle":
+        prompt += """
+- Bulk collect and FORALL statements
+- Exception handling with proper WHEN clauses
+- Cursor management and memory usage
+- Pragma directives usage
+- Lock escalation patterns
+"""
+    elif db_type == "SQL Server":
+        prompt += """
+- SET NOCOUNT ON usage
+- Transaction isolation levels
+- TRY-CATCH error handling
+- Table hints and lock escalation
+- Deadlock priority settings
+"""
+
+    prompt += """
+
+OUTPUT FORMAT:
+Provide analysis in the following sections:
+1. CRITICAL ISSUES (High priority problems)
+2. PERFORMANCE OPTIMIZATIONS (Performance improvements)
+3. BEST PRACTICE VIOLATIONS (Code quality issues)
+4. SECURITY CONCERNS (Security vulnerabilities)
+5. OPTIMIZED CODE (Improved version of the procedure)
+6. IMPLEMENTATION RECOMMENDATIONS (Step-by-step improvement plan)
+
+For each issue, provide:
+- Issue description
+- Severity level (Critical/High/Medium/Low)
+- Impact on performance/reliability
+- Specific fix recommendation
+- Code example where applicable
+"""
+
+    return prompt
+
+def display_analysis_results(response, db_type):
+    """Display formatted analysis results"""
+    
+    # Parse and display results
+    st.markdown(f"### 📊 Analysis Results for {db_type} Procedure")
+    
+    # Show the response in a formatted way
+    st.markdown(response)
+    
+    # Show summary metrics
+    st.markdown("""
+    <div class="success-banner">
+        <h4>✅ Analysis Completed Successfully</h4>
+        <p><strong>Issues Detected:</strong> Multiple optimization opportunities found</p>
+        <p><strong>Deadlock Risk:</strong> Assessed and mitigation strategies provided</p>
+        <p><strong>Performance Impact:</strong> Significant improvements possible</p>
+        <p><strong>Recommended Actions:</strong> Prioritized improvement plan generated</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_analyzer_demo_examples():
+    """Show demo examples of common stored procedure issues"""
+    
+    st.markdown("---")
+    st.markdown("### 📚 Common Issues & Solutions")
+    
+    issue_tabs = st.tabs([
+        "🔒 Deadlock Prevention", 
+        "⚡ Performance Optimization", 
+        "🛡️ Security Hardening",
+        "📋 Best Practices"
+    ])
+    
+    with issue_tabs[0]:
+        show_deadlock_examples()
+    
+    with issue_tabs[1]:
+        show_performance_examples()
+    
+    with issue_tabs[2]:
+        show_security_examples()
+    
+    with issue_tabs[3]:
+        show_best_practices_examples()
+
+def show_deadlock_examples():
+    """Show deadlock prevention examples"""
+    st.markdown("#### 🔒 Deadlock Prevention Strategies")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**❌ Deadlock-Prone Code:**")
+        st.code("""-- Inconsistent lock ordering
+PROCEDURE A:
+  UPDATE Table1 WHERE id = 1;
+  UPDATE Table2 WHERE id = 1;
+
+PROCEDURE B:
+  UPDATE Table2 WHERE id = 1;  -- Different order!
+  UPDATE Table1 WHERE id = 1;""", language="sql")
+        
+        st.markdown("**⚠️ Issues:**")
+        st.markdown("- Inconsistent table access order")
+        st.markdown("- No explicit lock hints")
+        st.markdown("- Long transaction duration")
+    
+    with col2:
+        st.markdown("**✅ Deadlock-Safe Code:**")
+        st.code("""-- Consistent lock ordering
+PROCEDURE A:
+  UPDATE Table1 WITH (UPDLOCK) WHERE id = 1;
+  UPDATE Table2 WITH (UPDLOCK) WHERE id = 1;
+
+PROCEDURE B:
+  UPDATE Table1 WITH (UPDLOCK) WHERE id = 1;  -- Same order!
+  UPDATE Table2 WITH (UPDLOCK) WHERE id = 1;""", language="sql")
+        
+        st.markdown("**✅ Improvements:**")
+        st.markdown("- Consistent access order")
+        st.markdown("- Explicit lock hints")
+        st.markdown("- Shorter transaction scope")
+
+def show_performance_examples():
+    """Show performance optimization examples"""
+    st.markdown("#### ⚡ Performance Optimization Techniques")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**❌ Slow Row-by-Row Processing:**")
+        st.code("""-- Inefficient cursor loop
+FOR order_rec IN (SELECT * FROM orders) LOOP
+    UPDATE order_summary 
+    SET total = total + order_rec.amount
+    WHERE id = order_rec.id;
+END LOOP;""", language="sql")
+        
+        st.markdown("**Performance Impact:**")
+        st.markdown("- 1000x slower than bulk operations")
+        st.markdown("- Excessive log writes")
+        st.markdown("- Lock escalation issues")
+    
+    with col2:
+        st.markdown("**✅ Optimized Bulk Operations:**")
+        st.code("""-- Efficient bulk update
+UPDATE order_summary 
+SET total = total + o.amount
+FROM order_summary os
+INNER JOIN orders o ON os.id = o.id
+WHERE o.status = 'NEW';""", language="sql")
+        
+        st.markdown("**Performance Gains:**")
+        st.markdown("- 95% faster execution")
+        st.markdown("- Reduced lock duration")
+        st.markdown("- Minimal log overhead")
+
+def show_security_examples():
+    """Show security hardening examples"""
+    st.markdown("#### 🛡️ Security Hardening Practices")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**❌ SQL Injection Vulnerable:**")
+        st.code("""-- Dangerous dynamic SQL
+PROCEDURE search_users(@username VARCHAR(50))
+AS
+BEGIN
+    DECLARE @sql NVARCHAR(MAX);
+    SET @sql = 'SELECT * FROM users WHERE username = ''' 
+               + @username + '''';
+    EXEC sp_executesql @sql;
+END""", language="sql")
+        
+        st.markdown("**Security Risks:**")
+        st.markdown("- SQL injection attacks")
+        st.markdown("- Data exfiltration")
+        st.markdown("- Privilege escalation")
+    
+    with col2:
+        st.markdown("**✅ Secure Parameterized Code:**")
+        st.code("""-- Safe parameterized query
+PROCEDURE search_users(@username VARCHAR(50))
+AS
+BEGIN
+    SELECT * FROM users 
+    WHERE username = @username
+    AND is_active = 1;
+END""", language="sql")
+        
+        st.markdown("**Security Benefits:**")
+        st.markdown("- Injection-proof parameters")
+        st.markdown("- Input validation")
+        st.markdown("- Principle of least privilege")
+
 def show_performance_analysis_demo():
     """Performance analysis and optimization demo"""
     st.subheader("📊 Performance Impact Analysis")
@@ -1169,6 +1650,533 @@ def show_performance_analysis_demo():
     
     chart_df = pd.DataFrame(perf_chart_data)
     st.bar_chart(chart_df.set_index('Database'))
+
+def show_stored_procedure_analyzer():
+    """Comprehensive stored procedure analyzer for deadlocks and optimization"""
+    st.subheader("🔍 Stored Procedure Query Analyzer")
+    st.markdown("**AI-powered analysis for deadlock detection, performance optimization, and best practices**")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("""
+        <div class="query-card">
+            <div class="card-title">📝 Stored Procedure Input</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Database selection for analysis
+        analysis_db = st.selectbox(
+            "Select Database Type for Analysis:",
+            ["PostgreSQL", "Oracle", "SQL Server"],
+            key="analyzer_db"
+        )
+        
+        # Sample procedures for demo
+        sample_procedures = {
+            "PostgreSQL": """-- PostgreSQL Stored Procedure with Potential Issues
+CREATE OR REPLACE FUNCTION update_account_balance(
+    p_account_id INTEGER,
+    p_amount NUMERIC,
+    p_transaction_type VARCHAR(20)
+) RETURNS VARCHAR(100) AS $
+DECLARE
+    v_current_balance NUMERIC;
+    v_new_balance NUMERIC;
+    v_result VARCHAR(100);
+BEGIN
+    -- Potential deadlock: No locking order
+    SELECT balance INTO v_current_balance 
+    FROM accounts 
+    WHERE account_id = p_account_id;
+    
+    -- Long running transaction without proper error handling
+    UPDATE accounts 
+    SET balance = balance + p_amount,
+        last_updated = CURRENT_TIMESTAMP
+    WHERE account_id = p_account_id;
+    
+    -- Another table update - different lock order
+    INSERT INTO transaction_log (
+        account_id, 
+        amount, 
+        transaction_type, 
+        created_at
+    ) VALUES (
+        p_account_id, 
+        p_amount, 
+        p_transaction_type, 
+        CURRENT_TIMESTAMP
+    );
+    
+    -- No explicit transaction management
+    -- No proper exception handling
+    
+    RETURN 'SUCCESS';
+END;
+$ LANGUAGE plpgsql;""",
+            
+            "Oracle": """-- Oracle PL/SQL with Performance Issues
+CREATE OR REPLACE PROCEDURE update_customer_orders(
+    p_customer_id IN NUMBER,
+    p_status IN VARCHAR2
+) AS
+    v_order_count NUMBER;
+    v_total_amount NUMBER;
+BEGIN
+    -- Inefficient cursor loop instead of bulk operations
+    FOR order_rec IN (
+        SELECT order_id, amount 
+        FROM orders 
+        WHERE customer_id = p_customer_id
+    ) LOOP
+        -- Row-by-row processing (slow)
+        UPDATE orders 
+        SET status = p_status,
+            updated_date = SYSDATE
+        WHERE order_id = order_rec.order_id;
+        
+        -- Potential deadlock: No consistent lock ordering
+        UPDATE customer_summary 
+        SET total_orders = total_orders + 1
+        WHERE customer_id = p_customer_id;
+        
+        -- Missing COMMIT in long-running transaction
+    END LOOP;
+    
+    -- No error handling
+    -- No transaction size management
+    
+    COMMIT;
+END;""",
+            
+            "SQL Server": """-- SQL Server Procedure with Deadlock Potential
+CREATE PROCEDURE UpdateInventoryAndSales
+    @ProductID INT,
+    @Quantity INT,
+    @SaleAmount DECIMAL(10,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- No transaction isolation level specified
+    BEGIN TRANSACTION;
+    
+    -- First table access - could cause deadlock
+    UPDATE Inventory 
+    SET Quantity = Quantity - @Quantity,
+        LastUpdated = GETDATE()
+    WHERE ProductID = @ProductID;
+    
+    -- Delay simulation - increases deadlock window
+    WAITFOR DELAY '00:00:02';
+    
+    -- Second table access - different lock order than other procedures
+    UPDATE Products 
+    SET TotalSales = TotalSales + @SaleAmount
+    WHERE ProductID = @ProductID;
+    
+    -- Third table - extends transaction time
+    INSERT INTO SalesHistory (
+        ProductID, 
+        Quantity, 
+        SaleAmount, 
+        SaleDate
+    ) VALUES (
+        @ProductID, 
+        @Quantity, 
+        @SaleAmount, 
+        GETDATE()
+    );
+    
+    -- No error handling
+    -- Long transaction without proper timeout
+    COMMIT TRANSACTION;
+END;"""
+        }
+        
+        if st.button(f"📋 Load Sample {analysis_db} Procedure"):
+            st.session_state.analyzer_procedure = sample_procedures[analysis_db]
+        
+        # Procedure input
+        procedure_code = st.text_area(
+            "Enter your stored procedure code:",
+            height=400,
+            key="analyzer_procedure",
+            placeholder=f"Enter your {analysis_db} stored procedure here..."
+        )
+        
+        # Analysis options
+        st.markdown("**Analysis Options:**")
+        col1a, col1b = st.columns(2)
+        with col1a:
+            check_deadlocks = st.checkbox("🔒 Deadlock Detection", value=True)
+            check_performance = st.checkbox("⚡ Performance Analysis", value=True)
+        with col1b:
+            check_best_practices = st.checkbox("📋 Best Practices", value=True)
+            check_security = st.checkbox("🛡️ Security Review", value=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="query-card">
+            <div class="card-title">🔍 Analysis Results</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        analysis_container = st.container()
+    
+    # Analysis button
+    if st.button("🚀 Analyze Stored Procedure", type="primary", use_container_width=True):
+        if procedure_code.strip():
+            analyze_stored_procedure(
+                procedure_code, analysis_db, 
+                check_deadlocks, check_performance, check_best_practices, check_security,
+                analysis_container
+            )
+        else:
+            st.error("❌ Please enter a stored procedure to analyze!")
+    
+    # Show example analysis results for demo
+    show_analyzer_demo_examples()
+
+def analyze_stored_procedure(procedure_code, db_type, check_deadlocks, check_performance, 
+                           check_best_practices, check_security, container):
+    """Analyze stored procedure using Claude AI"""
+    
+    with container:
+        with st.spinner(f"🤖 Analyzing {db_type} stored procedure..."):
+            try:
+                # Create analysis prompt
+                prompt = create_procedure_analysis_prompt(
+                    procedure_code, db_type, 
+                    check_deadlocks, check_performance, check_best_practices, check_security
+                )
+                
+                # Initialize Claude if not already done
+                claude_client = init_claude()
+                
+                # Call Claude AI
+                message = claude_client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=4000,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                
+                response = message.content[0].text
+                
+                # Display analysis results
+                display_analysis_results(response, db_type)
+                
+            except Exception as e:
+                st.error(f"❌ Analysis failed: {str(e)}")
+
+def create_procedure_analysis_prompt(procedure_code, db_type, check_deadlocks, 
+                                   check_performance, check_best_practices, check_security):
+    """Create comprehensive analysis prompt for Claude AI"""
+    
+    prompt = f"""You are an expert database performance engineer specializing in {db_type}. Analyze the following stored procedure for potential issues and optimizations.
+
+STORED PROCEDURE TO ANALYZE ({db_type}):
+```sql
+{procedure_code}
+```
+
+ANALYSIS REQUIREMENTS:
+"""
+
+    if check_deadlocks:
+        prompt += """
+1. DEADLOCK DETECTION:
+   - Identify potential deadlock scenarios
+   - Analyze lock ordering patterns
+   - Check for long-running transactions
+   - Suggest lock ordering improvements
+"""
+
+    if check_performance:
+        prompt += """
+2. PERFORMANCE ANALYSIS:
+   - Identify slow operations (row-by-row processing, inefficient queries)
+   - Suggest bulk operations where applicable
+   - Analyze indexing requirements
+   - Check for unnecessary operations
+"""
+
+    if check_best_practices:
+        prompt += """
+3. BEST PRACTICES REVIEW:
+   - Error handling implementation
+   - Transaction management
+   - Code structure and readability
+   - Maintainability concerns
+"""
+
+    if check_security:
+        prompt += """
+4. SECURITY REVIEW:
+   - SQL injection vulnerabilities
+   - Privilege escalation risks
+   - Data exposure concerns
+   - Input validation issues
+"""
+
+    prompt += f"""
+
+DATABASE-SPECIFIC CONSIDERATIONS FOR {db_type}:
+"""
+
+    if db_type == "PostgreSQL":
+        prompt += """
+- Function vs procedure usage
+- Exception handling with EXCEPTION blocks
+- PERFORM vs SELECT for non-returning statements
+- Proper use of STRICT keyword
+- Advisory locks for deadlock prevention
+"""
+    elif db_type == "Oracle":
+        prompt += """
+- Bulk collect and FORALL statements
+- Exception handling with proper WHEN clauses
+- Cursor management and memory usage
+- Pragma directives usage
+- Lock escalation patterns
+"""
+    elif db_type == "SQL Server":
+        prompt += """
+- SET NOCOUNT ON usage
+- Transaction isolation levels
+- TRY-CATCH error handling
+- Table hints and lock escalation
+- Deadlock priority settings
+"""
+
+    prompt += """
+
+OUTPUT FORMAT:
+Provide analysis in the following sections:
+1. CRITICAL ISSUES (High priority problems)
+2. PERFORMANCE OPTIMIZATIONS (Performance improvements)
+3. BEST PRACTICE VIOLATIONS (Code quality issues)
+4. SECURITY CONCERNS (Security vulnerabilities)
+5. OPTIMIZED CODE (Improved version of the procedure)
+6. IMPLEMENTATION RECOMMENDATIONS (Step-by-step improvement plan)
+
+For each issue, provide:
+- Issue description
+- Severity level (Critical/High/Medium/Low)
+- Impact on performance/reliability
+- Specific fix recommendation
+- Code example where applicable
+"""
+
+    return prompt
+
+def display_analysis_results(response, db_type):
+    """Display formatted analysis results"""
+    
+    # Parse and display results
+    st.markdown(f"### 📊 Analysis Results for {db_type} Procedure")
+    
+    # Show the response in a formatted way
+    st.markdown(response)
+    
+    # Show summary metrics
+    st.markdown("""
+    <div class="success-banner">
+        <h4>✅ Analysis Completed Successfully</h4>
+        <p><strong>Issues Detected:</strong> Multiple optimization opportunities found</p>
+        <p><strong>Deadlock Risk:</strong> Assessed and mitigation strategies provided</p>
+        <p><strong>Performance Impact:</strong> Significant improvements possible</p>
+        <p><strong>Recommended Actions:</strong> Prioritized improvement plan generated</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def show_analyzer_demo_examples():
+    """Show demo examples of common stored procedure issues"""
+    
+    st.markdown("---")
+    st.markdown("### 📚 Common Issues & Solutions")
+    
+    issue_tabs = st.tabs([
+        "🔒 Deadlock Prevention", 
+        "⚡ Performance Optimization", 
+        "🛡️ Security Hardening",
+        "📋 Best Practices"
+    ])
+    
+    with issue_tabs[0]:
+        show_deadlock_examples()
+    
+    with issue_tabs[1]:
+        show_performance_examples()
+    
+    with issue_tabs[2]:
+        show_security_examples()
+    
+    with issue_tabs[3]:
+        show_best_practices_examples()
+
+def show_deadlock_examples():
+    """Show deadlock prevention examples"""
+    st.markdown("#### 🔒 Deadlock Prevention Strategies")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**❌ Deadlock-Prone Code:**")
+        st.code("""-- Inconsistent lock ordering
+PROCEDURE A:
+  UPDATE Table1 WHERE id = 1;
+  UPDATE Table2 WHERE id = 1;
+
+PROCEDURE B:
+  UPDATE Table2 WHERE id = 1;  -- Different order!
+  UPDATE Table1 WHERE id = 1;""", language="sql")
+        
+        st.markdown("**⚠️ Issues:**")
+        st.markdown("- Inconsistent table access order")
+        st.markdown("- No explicit lock hints")
+        st.markdown("- Long transaction duration")
+    
+    with col2:
+        st.markdown("**✅ Deadlock-Safe Code:**")
+        st.code("""-- Consistent lock ordering
+PROCEDURE A:
+  UPDATE Table1 WITH (UPDLOCK) WHERE id = 1;
+  UPDATE Table2 WITH (UPDLOCK) WHERE id = 1;
+
+PROCEDURE B:
+  UPDATE Table1 WITH (UPDLOCK) WHERE id = 1;  -- Same order!
+  UPDATE Table2 WITH (UPDLOCK) WHERE id = 1;""", language="sql")
+        
+        st.markdown("**✅ Improvements:**")
+        st.markdown("- Consistent access order")
+        st.markdown("- Explicit lock hints")
+        st.markdown("- Shorter transaction scope")
+
+def show_performance_examples():
+    """Show performance optimization examples"""
+    st.markdown("#### ⚡ Performance Optimization Techniques")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**❌ Slow Row-by-Row Processing:**")
+        st.code("""-- Inefficient cursor loop
+FOR order_rec IN (SELECT * FROM orders) LOOP
+    UPDATE order_summary 
+    SET total = total + order_rec.amount
+    WHERE id = order_rec.id;
+END LOOP;""", language="sql")
+        
+        st.markdown("**Performance Impact:**")
+        st.markdown("- 1000x slower than bulk operations")
+        st.markdown("- Excessive log writes")
+        st.markdown("- Lock escalation issues")
+    
+    with col2:
+        st.markdown("**✅ Optimized Bulk Operations:**")
+        st.code("""-- Efficient bulk update
+UPDATE order_summary 
+SET total = total + o.amount
+FROM order_summary os
+INNER JOIN orders o ON os.id = o.id
+WHERE o.status = 'NEW';""", language="sql")
+        
+        st.markdown("**Performance Gains:**")
+        st.markdown("- 95% faster execution")
+        st.markdown("- Reduced lock duration")
+        st.markdown("- Minimal log overhead")
+
+def show_security_examples():
+    """Show security hardening examples"""
+    st.markdown("#### 🛡️ Security Hardening Practices")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**❌ SQL Injection Vulnerable:**")
+        st.code("""-- Dangerous dynamic SQL
+PROCEDURE search_users(@username VARCHAR(50))
+AS
+BEGIN
+    DECLARE @sql NVARCHAR(MAX);
+    SET @sql = 'SELECT * FROM users WHERE username = ''' 
+               + @username + '''';
+    EXEC sp_executesql @sql;
+END""", language="sql")
+        
+        st.markdown("**Security Risks:**")
+        st.markdown("- SQL injection attacks")
+        st.markdown("- Data exfiltration")
+        st.markdown("- Privilege escalation")
+    
+    with col2:
+        st.markdown("**✅ Secure Parameterized Code:**")
+        st.code("""-- Safe parameterized query
+PROCEDURE search_users(@username VARCHAR(50))
+AS
+BEGIN
+    SELECT * FROM users 
+    WHERE username = @username
+    AND is_active = 1;
+END""", language="sql")
+        
+        st.markdown("**Security Benefits:**")
+        st.markdown("- Injection-proof parameters")
+        st.markdown("- Input validation")
+        st.markdown("- Principle of least privilege")
+
+def show_best_practices_examples():
+    """Show best practices examples"""
+    st.markdown("#### 📋 Database Best Practices")
+    
+    practices_data = {
+        'Practice': [
+            'Error Handling',
+            'Transaction Management', 
+            'Resource Cleanup',
+            'Performance Monitoring',
+            'Code Documentation',
+            'Testing Strategy'
+        ],
+        'Importance': ['Critical', 'Critical', 'High', 'High', 'Medium', 'High'],
+        'Impact': [
+            'Prevents data corruption',
+            'Ensures ACID compliance',
+            'Avoids memory leaks',
+            'Identifies bottlenecks',
+            'Improves maintainability',
+            'Ensures reliability'
+        ],
+        'Implementation': [
+            'TRY-CATCH blocks',
+            'Explicit BEGIN/COMMIT',
+            'Close cursors/connections',
+            'Execution plan analysis',
+            'Inline comments',
+            'Unit test procedures'
+        ]
+    }
+    
+    df = pd.DataFrame(practices_data)
+    st.dataframe(df, use_container_width=True)
+    
+    # Best practices summary
+    st.markdown("""
+    <div class="optimization-banner">
+        <h4>🎯 Key Recommendations</h4>
+        <ul>
+            <li><strong>Always use explicit transactions</strong> with proper error handling</li>
+            <li><strong>Implement consistent lock ordering</strong> to prevent deadlocks</li>
+            <li><strong>Use bulk operations</strong> instead of row-by-row processing</li>
+            <li><strong>Parameterize all user inputs</strong> to prevent SQL injection</li>
+            <li><strong>Monitor execution plans</strong> and optimize based on actual usage</li>
+            <li><strong>Document complex business logic</strong> for future maintenance</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 def show_trigger_migration_demo():
     """Trigger migration demo"""
